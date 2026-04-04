@@ -2,6 +2,8 @@ py -3.10 -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 
-
+Run in powershell:
+$env:TWILIO_SID="AC94918b42558210d95020371fbaf5028d"
+$env:TWILIO_AUTH="ff12ca5bf002bdbb519065fa8368187d" 
 // ensure that IP webcam server's IP and CAMERA_URL = "http://xx.xxx.xxx.xxx:8080/video" matches in app.py file
 streamlit run pipeline/app.py
