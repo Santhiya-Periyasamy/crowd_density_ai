@@ -34,8 +34,8 @@ RESIZE_W, RESIZE_H = 640, 360
 CAPTURE_INTERVAL = 2  
 
 ALPHA, BETA, GAMMA = 0.4, 0.3, 0.3
-LOW_T, MED_T = 0.01, 0.02
-WINDOW = 1
+LOW_T, MED_T = 0.3, 0.6
+WINDOW = 3
 
 MAX_DENSITY_CLIP = 300.0
 MOTION_SCALE = 0.3
@@ -198,7 +198,7 @@ while True:
             df["risk"] = np.clip(df["risk"], 0, 1)
             risk = df.iloc[-1]["risk"]
 
-            if risk > 0.01 or density_sum > 1:
+            if len(df) >= WINDOW and (df["risk"].iloc[-WINDOW:] > MED_T).all():
                 final_label = "HIGH"
             elif risk > LOW_T:
                 final_label = "MEDIUM"
