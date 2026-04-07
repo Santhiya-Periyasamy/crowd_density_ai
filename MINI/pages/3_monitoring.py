@@ -18,6 +18,24 @@ import torch
 import numpy as np
 import pandas as pd
 from torchvision import transforms
+from twilio.rest import Client
+
+# Twilio credentials
+ACCOUNT_SID = "AC94918b42558210d95020371fbaf5028d"
+AUTH_TOKEN = "2a222b653a49179b13d892b8c74498f8"
+TWILIO_NUMBER = "+12137154187"
+PHONE_NUMBER = "+919042256045"
+TEXT = "⚠️ CrowdGuard Alert: Crowd Risk Detected"
+
+def send_sms():
+    client = Client(ACCOUNT_SID, AUTH_TOKEN)
+    message = client.messages.create(
+        body=TEXT,
+        from_=TWILIO_NUMBER,
+        to=PHONE_NUMBER
+    )
+    print("Message SID:", message.sid)
+    print("SMS SENT SUCCESSFULLY")
 from models.csrnet.csrnet_model import CSRNet
 
 import winsound
@@ -39,6 +57,11 @@ def person_present(frame):
 # ---------------- ALARM ----------------
 alarm_active = False
 
+def append_log_row(row):
+    df_row = pd.DataFrame([row])
+    df_row.to_csv(LOG_FILE, mode="a", header=not os.path.exists(LOG_FILE), index=False)
+
+
 def alarm_siren(duration=5):
     global alarm_active
     if alarm_active:
@@ -46,6 +69,13 @@ def alarm_siren(duration=5):
 
     alarm_active = True
     print("🚨 EMERGENCY ALARM STARTED")
+
+    # Send SMS alert
+    try:
+        # send_sms()
+        print("Message sent")
+    except Exception as e:
+        print(f"Failed to send SMS: {e}")
 
     end_time = time.time() + duration
     while time.time() < end_time:
@@ -108,6 +138,10 @@ ROLL = 10
 BASELINE_FRAMES = 5
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+LOG_DIR = os.path.join(ROOT_DIR, "logs")
+LOG_FILE = os.path.join(LOG_DIR, "monitoring_log.csv")
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # ---------------- VIDEO STREAM ----------------
 class VideoStream:
@@ -310,6 +344,16 @@ if not st.session_state.force_stop:
                     label_counter = 0
 
             final_label = stable_label
+
+            # ---------- LOGGING ----------
+            log_row = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "density": float(smooth_density),
+                "motion": float(smooth_motion),
+                "risk": float(risk),
+                "label": final_label
+            }
+            append_log_row(log_row)
 
             # ---------- UI ----------
             density_box.metric("Density Signal", f"{smooth_density:.2f}")

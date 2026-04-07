@@ -12,7 +12,7 @@ if os.path.exists(css_path):
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # ---------------- LOGO PATH ----------------
-logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "logo.jpeg")
+logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "logos.png")
 
 # ---------------- LAYOUT ----------------
 col1, col2 = st.columns([1, 2])
