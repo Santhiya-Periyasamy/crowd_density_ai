@@ -52,10 +52,8 @@ with col2:
 st.markdown("---")
 st.subheader("🎥 Input Source")
 
-source_type = st.radio(
-    "Select Source Type",
-    ["Live Camera (IP Webcam)"]
-)
+source_type = "Live Camera (IP Webcam)"
+st.info("Source Type: **Live Camera (IP Webcam)**")
 
 camera_url = st.text_input("Enter Camera URL (e.g. http://ip:8080/video)")
 
