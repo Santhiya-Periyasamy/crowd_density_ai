@@ -54,21 +54,14 @@ st.subheader("🎥 Input Source")
 
 source_type = st.radio(
     "Select Source Type",
-    ["Live Camera (IP Webcam)", "Upload Video"]
+    ["Live Camera (IP Webcam)"]
 )
 
-camera_url = None
-video_file = None
-
-if source_type == "Live Camera (IP Webcam)":
-    camera_url = st.text_input("Enter Camera URL (e.g. http://ip:8080/video)")
-
-elif source_type == "Upload Video":
-    video_file = st.file_uploader("Upload Video", type=["mp4", "avi", "mov"])
+camera_url = st.text_input("Enter Camera URL (e.g. http://ip:8080/video)")
 
 # ---------------- ADVANCED SETTINGS ----------------
 st.markdown("---")
-st.subheader("⚡ Advanced Settings (Optional)")
+st.subheader("⚡ Advanced Settings")
 
 col3, col4 = st.columns(2)
 
@@ -82,20 +75,9 @@ with col4:
 if st.button("🚀 Start Monitoring"):
 
     # Validate input
-    if source_type == "Live Camera (IP Webcam)" and not camera_url:
+    if not camera_url:
         st.error("Please enter camera URL")
         st.stop()
-
-    if source_type == "Upload Video" and video_file is None:
-        st.error("Please upload a video")
-        st.stop()
-    
-    video_path = None
-    if video_file is not None:
-        import tempfile
-        tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-        tfile.write(video_file.read())
-        video_path = tfile.name
     # Store everything
     st.session_state["config"] = {
         "environment": environment,
@@ -107,12 +89,11 @@ if st.button("🚀 Start Monitoring"):
         "sensitivity": sensitivity,
         "auto_alarm": auto_alarm,
         "source": {
-            "type": "camera" if source_type.startswith("Live") else "video",
-            "url": camera_url,
-            "file": video_file
+            "type": "camera",
+            "url": camera_url
         }
     }
 
     st.success("✅ Configuration saved!")
 
-    st.switch_page("pages/3_monitoring.py")
+    st.switch_page("pages/4_env.py")

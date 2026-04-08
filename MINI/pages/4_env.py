@@ -36,7 +36,6 @@ def send_sms():
     )
     print("Message SID:", message.sid)
     print("SMS SENT SUCCESSFULLY")
-
 from models.csrnet.csrnet_model import CSRNet
 
 import winsound
@@ -95,6 +94,7 @@ st.caption("Early Stampede Risk Detection using Density–Motion Fusion")
 # ---------------- CONFIG ----------------
 config = st.session_state.get("config", None)
 
+
 # ✅ Single safe check
 if "config" not in st.session_state:
     st.error("Please complete setup first!")
@@ -103,6 +103,41 @@ if "config" not in st.session_state:
     st.stop()
 
 config = st.session_state["config"]
+# ---------------- ENVIRONMENT FACTORS ----------------
+ENV_FACTOR = {
+    "Room": 0.7,
+    "Hall": 0.9,
+    "Outdoor Ground": 1.2,
+    "Stadium": 1.3,
+    "Street/Event Area": 1.0
+}
+
+CROWD_FACTOR = {
+    "Calm": 0.8,
+    "Moderate Movement": 1.0,
+    "Highly Dynamic": 1.3
+}
+
+LIGHT_FACTOR = {
+    "Good": 1.0,
+    "Moderate": 0.9,
+    "Low Light": 0.75
+}
+
+OCCLUSION_FACTOR = {
+    "Clear View": 1.0,
+    "Partial Obstruction": 1.2,
+    "Heavy Occlusion": 1.4
+}
+
+# Extract config
+area = config["area"]
+env_scale = ENV_FACTOR[config["environment"]]
+crowd_scale = CROWD_FACTOR[config["crowd_type"]]
+light_scale = LIGHT_FACTOR[config["lighting"]]
+occlusion_scale = OCCLUSION_FACTOR[config["occlusion"]]
+height = config["camera_height"]
+sensitivity = config["sensitivity"]
 
 if "source" not in config:
     st.error("No input source in config!")
@@ -111,20 +146,16 @@ if "source" not in config:
 source = config["source"]
 
 # ✅ Set CAMERA_URL based on source type
-if source["type"] == "camera":
-    CAMERA_URL = source["url"]
-else:
-    CAMERA_URL = source["file"]
+CAMERA_URL = source["url"]
 
 if not CAMERA_URL:
-    st.error("Camera URL or video file is missing!")
+    st.error("Camera URL is missing!")
     if st.button("Go back to Setup"):
         st.switch_page("pages/2_details.py")
     st.stop()
 
 CSRNET_WEIGHTS = r"models/weights/csrnet_best.pth"
 
-# 1920 × 1080(IP web cam) => (640 x 360) for csrnet and optical flow
 RESIZE_W, RESIZE_H = 640, 360
 
 CAPTURE_INTERVAL = 0.5
@@ -224,7 +255,7 @@ if not st.session_state.force_stop:
     smooth_density = 0.0
     smooth_motion = 0.0
 
-    # NEW STABILITY VARIABLES
+    # 🔥 NEW STABILITY VARIABLES
     smooth_risk = 0.0
     RISK_SMOOTH = 0.2
 
@@ -258,6 +289,21 @@ if not st.session_state.force_stop:
                 density_map = model(inp).cpu().numpy()[0, 0]
 
             raw_density = np.clip(density_map.sum(), 0, MAX_DENSITY_CLIP)
+            density_per_m2 = raw_density / max(area, 1)
+
+            # --- CAMERA HEIGHT CORRECTION ---
+            if height > 10:
+                density_per_m2 *= 1.2
+            elif height < 3:
+                density_per_m2 *= 0.9
+
+            # --- OCCLUSION COMPENSATION ---
+            density_per_m2 *= occlusion_scale
+
+            # --- ENVIRONMENT SCALING ---
+            density_per_m2 *= env_scale
+
+            raw_density = density_per_m2
 
             # ---------- Optical Flow ----------
             gray = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2GRAY)
@@ -275,6 +321,7 @@ if not st.session_state.force_stop:
 
                 mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
                 raw_motion = (np.mean(mag) * np.var(ang)) * MOTION_SCALE
+                raw_motion *= crowd_scale
 
             prev_gray = gray
 
@@ -319,6 +366,14 @@ if not st.session_state.force_stop:
                 )
 
                 risk = np.clip(df.iloc[-1]["risk"], 0, 1)
+                # --- LIGHTING CONFIDENCE ---
+                risk *= light_scale
+
+                # --- SENSITIVITY CONTROL ---
+                LOW_T = 0.3 - (0.15 * sensitivity)
+                MED_T = 0.6 - (0.2 * sensitivity)
+
+                risk = np.clip(risk, 0, 1)
                 if len(df) > 0:
                     df.loc[df.index[-1], "risk"] = risk
             # ---------- SMOOTH RISK ----------
@@ -362,7 +417,7 @@ if not st.session_state.force_stop:
             motion_box.metric("Motion Instability", f"{smooth_motion:.4f}")
             score_placeholder.metric("Risk Score", f"{risk:.3f}")
 
-            if final_label == "HIGH":
+            if final_label == "HIGH" and config["auto_alarm"]:
                 risk_placeholder.error("🔴 HIGH RISK — Immediate Action Required")
                 threading.Thread(target=alarm_siren, daemon=True).start()
             elif final_label == "MEDIUM":
